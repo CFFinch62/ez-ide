@@ -4,6 +4,9 @@ The primary application window integrating all components
 """
 
 import os
+import sys
+import subprocess
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -440,6 +443,10 @@ class EZIDEMainWindow(QMainWindow):
         self.toggle_terminal_action.setChecked(self.settings.settings.terminal.visible)
         self.toggle_terminal_action.triggered.connect(self._toggle_terminal)
         
+        open_external_term_action = view_menu.addAction("Open &External Terminal")
+        open_external_term_action.setShortcut("Ctrl+Shift+T")
+        open_external_term_action.triggered.connect(self._open_external_terminal)
+        
         view_menu.addSeparator()
         
         terminal_position_menu = view_menu.addMenu("Terminal Position")
@@ -578,6 +585,11 @@ class EZIDEMainWindow(QMainWindow):
         terminal_btn.setChecked(self.settings.settings.terminal.visible)
         terminal_btn.triggered.connect(self._toggle_terminal)
         self.terminal_toolbar_btn = terminal_btn
+        
+        # External Terminal
+        ext_term_btn = toolbar.addAction("📟 Ext. Term")
+        ext_term_btn.setToolTip("Open External Terminal (Ctrl+Shift+T)")
+        ext_term_btn.triggered.connect(self._open_external_terminal)
         
         toolbar.addSeparator()
         
@@ -798,6 +810,77 @@ class EZIDEMainWindow(QMainWindow):
         # Update menu checkmarks
         for action in self.terminal_position_actions:
             action.setChecked(action.text().lower() == position)
+
+    def _open_external_terminal(self):
+        """Open an external terminal window in the current directory"""
+        # Determine working directory
+        cwd = self.file_browser.current_root
+        if not cwd or not os.path.isdir(cwd):
+            cwd = str(Path.home())
+            
+        try:
+            if sys.platform == 'win32':
+                # Windows
+                subprocess.Popen(f'start cmd /K "cd /d {cwd}"', shell=True)
+                
+            elif sys.platform == 'darwin':
+                # macOS
+                subprocess.Popen(['open', '-a', 'Terminal', cwd])
+                
+            else:
+                # Linux / Unix
+                self._open_linux_terminal(cwd)
+                
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to launch terminal:\n{str(e)}"
+            )
+
+    def _open_linux_terminal(self, cwd):
+        """Helper to open Linux terminal"""
+        # Detect available terminal emulator
+        terminals = [
+            'gnome-terminal',
+            'konsole', 
+            'xfce4-terminal',
+            'mate-terminal',
+            'terminator',
+            'xterm',
+            'urxvt',
+            'rxvt',
+            'x-terminal-emulator'
+        ]
+        
+        terminal_cmd = None
+        for term in terminals:
+            if shutil.which(term):
+                terminal_cmd = term
+                break
+        
+        if not terminal_cmd:
+            QMessageBox.warning(
+                self, 
+                "Terminal Not Found", 
+                "Could not detect a supported external terminal emulator.\n"
+                "Please install gnome-terminal, konsole, xterm, or ensure 'x-terminal-emulator' is configured."
+            )
+            return
+            
+        # Construct command based on terminal type
+        if terminal_cmd == 'gnome-terminal':
+            subprocess.Popen([terminal_cmd, '--working-directory', cwd])
+        elif terminal_cmd == 'konsole':
+                subprocess.Popen([terminal_cmd, '--workdir', cwd])
+        elif terminal_cmd == 'xfce4-terminal':
+            subprocess.Popen([terminal_cmd, '--working-directory', cwd])
+        elif terminal_cmd == 'mate-terminal':
+            subprocess.Popen([terminal_cmd, '--working-directory', cwd])
+        else:
+            # Fallback for xterm and others that don't always support working-dir flags nicely
+            # But usually start in CWD if we pass cwd param to Popen
+            subprocess.Popen([terminal_cmd], cwd=cwd)
     
     def _zoom_in(self):
         editor = self.editor_tabs.get_current_editor()

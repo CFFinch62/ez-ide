@@ -77,14 +77,23 @@ chmod +x setup.sh run.sh
 ./setup.sh
 ```
 
+### Windows
+Double-click `setup.bat` to install dependencies.
+
 ## Usage
 
 ### Starting the IDE
 
+### Linux / macOS
 ```bash
 # Using the run script (recommended)
 ./run.sh
+```
 
+### Windows
+Double-click `run.bat` to start the IDE.
+
+```bash
 # Or manually
 source venv/bin/activate
 python main.py

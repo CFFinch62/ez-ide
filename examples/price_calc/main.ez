@@ -110,26 +110,31 @@ do calculate(choice1, choice2 int, val1, val2 float) -> (float, float, float, fl
     }
     
     // Match combinations (c1 is always the lower number)
+    temp price float = 0.0
+    temp margin float = 0.0
+    temp profit float = 0.0
+    temp markup float = 0.0
+    temp cost float = 0.0
+    
     if c1 == PRICE && c2 == MARGIN {
-        return formulas.solve_from_price_and_margin(v1, v2)
+        price, margin, profit, markup, cost = formulas.solve_from_price_and_margin(v1, v2)
     } or c1 == PRICE && c2 == PROFIT {
-        return formulas.solve_from_price_and_profit(v1, v2)
+        price, margin, profit, markup, cost = formulas.solve_from_price_and_profit(v1, v2)
     } or c1 == PRICE && c2 == MARKUP {
-        return formulas.solve_from_price_and_markup(v1, v2)
+        price, margin, profit, markup, cost = formulas.solve_from_price_and_markup(v1, v2)
     } or c1 == PRICE && c2 == COST {
-        return formulas.solve_from_price_and_cost(v1, v2)
+        price, margin, profit, markup, cost = formulas.solve_from_price_and_cost(v1, v2)
     } or c1 == MARGIN && c2 == PROFIT {
-        return formulas.solve_from_profit_and_margin(v2, v1)
+        price, margin, profit, markup, cost = formulas.solve_from_profit_and_margin(v2, v1)
     } or c1 == MARGIN && c2 == COST {
-        return formulas.solve_from_cost_and_margin(v2, v1)
+        price, margin, profit, markup, cost = formulas.solve_from_cost_and_margin(v2, v1)
     } or c1 == PROFIT && c2 == MARKUP {
-        return formulas.solve_from_profit_and_markup(v1, v2)
+        price, margin, profit, markup, cost = formulas.solve_from_profit_and_markup(v1, v2)
     } or c1 == PROFIT && c2 == COST {
-        return formulas.solve_from_cost_and_profit(v2, v1)
+        price, margin, profit, markup, cost = formulas.solve_from_cost_and_profit(v2, v1)
     } or c1 == MARKUP && c2 == COST {
-        return formulas.solve_from_cost_and_markup(v2, v1)
+        price, margin, profit, markup, cost = formulas.solve_from_cost_and_markup(v2, v1)
     }
     
-    // Fallback (should not reach here)
-    return 0.0, 0.0, 0.0, 0.0, 0.0
+    return price, margin, profit, markup, cost
 }

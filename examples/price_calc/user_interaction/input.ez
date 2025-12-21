@@ -17,7 +17,7 @@ const MARKUP int = 4
 do get_numeric_input(prompt string) -> float {
     printf(prompt)
     temp value_str string = input()
-    temp value float, err error = strings.to_float(value_str)
+    temp value float = strings.to_float(value_str)
     return value
 }
 
@@ -25,7 +25,7 @@ do get_numeric_input(prompt string) -> float {
 do get_menu_choice() -> int {
     printf("Enter choice (1-5): ")
     temp choice_str string = input()
-    temp choice int, err error = strings.to_int(choice_str)
+    temp choice int = strings.to_int(choice_str)
     return choice
 }
 

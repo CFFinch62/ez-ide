@@ -25,6 +25,8 @@ from app.themes import ThemeManager, Theme
 from app.file_browser import FileBrowserWidget
 from app.editor import EditorTabs
 from app.terminal import TerminalWidget
+from app.debug_session import DebugSession
+from app.debug_panel import DebugPanel
 
 
 class SettingsDialog(QDialog):
@@ -216,6 +218,7 @@ class EZIDEMainWindow(QMainWindow):
         self._setup_statusbar()
         self._setup_shortcuts()
         self._setup_connections()
+        self._setup_debug()
     
     def _restore_window_state(self):
         """Restore window size and state"""
@@ -281,6 +284,13 @@ class EZIDEMainWindow(QMainWindow):
             self.terminal_container.hide()
         
         main_layout.addWidget(self.main_splitter)
+        
+        # Debug panel (initially hidden)
+        self.debug_panel = DebugPanel(self.theme_manager.get_current_theme())
+        self.debug_panel.setMinimumWidth(250)
+        self.debug_panel.setMaximumWidth(400)
+        self.debug_panel.hide()
+        self.main_splitter.addWidget(self.debug_panel)
         
         # Handle terminal position (bottom vs right)
         self._update_terminal_position()
@@ -484,6 +494,30 @@ class EZIDEMainWindow(QMainWindow):
         select_interpreter_action = run_menu.addAction("Select EZ &Interpreter...")
         select_interpreter_action.triggered.connect(self._select_ez_interpreter)
         
+        # Debug menu
+        debug_menu = menubar.addMenu("&Debug")
+        
+        self.debug_start_action = debug_menu.addAction("&Start Debugging")
+        self.debug_start_action.setShortcut("F5")
+        self.debug_start_action.triggered.connect(self._debug_start)
+        
+        self.debug_step_action = debug_menu.addAction("Step &Over")
+        self.debug_step_action.setShortcut("F10")
+        self.debug_step_action.setEnabled(False)
+        self.debug_step_action.triggered.connect(self._debug_step)
+        
+        self.debug_stop_action = debug_menu.addAction("S&top Debugging")
+        self.debug_stop_action.setShortcut("Shift+F5")
+        self.debug_stop_action.setEnabled(False)
+        self.debug_stop_action.triggered.connect(self._debug_stop)
+        
+        debug_menu.addSeparator()
+        
+        self.toggle_debug_panel_action = debug_menu.addAction("Toggle Debug &Panel")
+        self.toggle_debug_panel_action.setShortcut("Ctrl+Shift+D")
+        self.toggle_debug_panel_action.setCheckable(True)
+        self.toggle_debug_panel_action.triggered.connect(self._toggle_debug_panel)
+        
         # Help menu
         help_menu = menubar.addMenu("&Help")
         
@@ -499,6 +533,11 @@ class EZIDEMainWindow(QMainWindow):
         toolbar.setMovable(False)
         toolbar.setIconSize(QSize(20, 20))
         self.addToolBar(toolbar)
+        
+        # Set font with emoji support
+        toolbar_font = QFont()
+        toolbar_font.setFamilies(["Sans", "Noto Color Emoji", "Segoe UI Emoji", "Apple Color Emoji"])
+        toolbar.setFont(toolbar_font)
         
         # New file
         new_btn = toolbar.addAction("📄 New")
@@ -539,6 +578,13 @@ class EZIDEMainWindow(QMainWindow):
         terminal_btn.setChecked(self.settings.settings.terminal.visible)
         terminal_btn.triggered.connect(self._toggle_terminal)
         self.terminal_toolbar_btn = terminal_btn
+        
+        toolbar.addSeparator()
+        
+        # Debug button
+        debug_btn = toolbar.addAction("🐛 Debug")
+        debug_btn.setToolTip("Start Debugging (F5)")
+        debug_btn.triggered.connect(self._debug_start)
     
     def _setup_statusbar(self):
         """Set up the status bar"""
@@ -869,3 +915,123 @@ class EZIDEMainWindow(QMainWindow):
         
         self.settings.save()
         event.accept()
+    
+    # Debug operations
+    def _setup_debug(self):
+        """Initialize the debug session and connect signals"""
+        self.debug_session = DebugSession(self.settings, self)
+        self._debug_filepath = None  # Track the file being debugged
+        
+        # Connect debug session signals
+        self.debug_session.session_started.connect(self._on_debug_started)
+        self.debug_session.session_ended.connect(self._on_debug_ended)
+        self.debug_session.line_changed.connect(self._on_debug_line_changed)
+        self.debug_session.variable_updated.connect(self._on_debug_variable_updated)
+        self.debug_session.output_received.connect(self._on_debug_output)
+        self.debug_session.error_received.connect(self._on_debug_error)
+        self.debug_session.ready_for_step.connect(self._on_debug_ready)
+        
+        # Connect debug panel signals
+        self.debug_panel.start_requested.connect(self._debug_start)
+        self.debug_panel.step_requested.connect(self._debug_step)
+        self.debug_panel.stop_requested.connect(self._debug_stop)
+    
+    def _toggle_debug_panel(self):
+        """Toggle visibility of the debug panel"""
+        visible = self.debug_panel.isVisible()
+        self.debug_panel.setVisible(not visible)
+        self.toggle_debug_panel_action.setChecked(not visible)
+    
+    def _debug_start(self):
+        """Start debugging the current file"""
+        filepath = self.editor_tabs.get_current_filepath()
+        if not filepath or not filepath.endswith('.ez'):
+            self.statusbar.showMessage("No EZ file to debug", 3000)
+            return
+        
+        # Save the file first
+        self.editor_tabs.save_current()
+        
+        # Show debug panel
+        if not self.debug_panel.isVisible():
+            self.debug_panel.show()
+            self.toggle_debug_panel_action.setChecked(True)
+        
+        # Clear previous debug output for fresh start
+        self.debug_panel.reset()
+        
+        # Start the debug session
+        self._debug_filepath = filepath
+        if self.debug_session.start(filepath):
+            self.statusbar.showMessage(f"Debugging: {os.path.basename(filepath)}", 0)
+    
+    def _debug_step(self):
+        """Execute next statement"""
+        if self.debug_session.is_running:
+            self.debug_panel.set_step_enabled(False)  # Disable until ready
+            has_more = self.debug_session.step()
+            if not has_more:
+                self._debug_stop()
+    
+    def _debug_stop(self):
+        """Stop the debug session"""
+        if self.debug_session.is_running:
+            self.debug_session.stop()
+        
+        # Clear debug line highlight
+        if self._debug_filepath:
+            editor = self.editor_tabs.get_editor_for_file(self._debug_filepath)
+            if editor:
+                editor.clear_debug_line()
+        
+        self._debug_filepath = None
+        # Just update toolbar, don't reset output so user can see final results
+        self.debug_panel.toolbar.set_debugging(False)
+        self.statusbar.showMessage("Debug session ended", 3000)
+    
+    def _on_debug_started(self):
+        """Handle debug session start"""
+        self.debug_panel.set_debugging(True)
+        # Don't reset here - we want to keep accumulating output
+        self.debug_start_action.setEnabled(False)
+        self.debug_step_action.setEnabled(True)
+        self.debug_stop_action.setEnabled(True)
+    
+    def _on_debug_ended(self):
+        """Handle debug session end"""
+        # Just update toolbar state, don't clear output so user can see final results
+        self.debug_panel.toolbar.set_debugging(False)
+        self.debug_start_action.setEnabled(True)
+        self.debug_step_action.setEnabled(False)
+        self.debug_stop_action.setEnabled(False)
+        
+        # Clear debug line
+        if self._debug_filepath:
+            editor = self.editor_tabs.get_editor_for_file(self._debug_filepath)
+            if editor:
+                editor.clear_debug_line()
+    
+    def _on_debug_line_changed(self, line: int):
+        """Handle debug line change"""
+        if self._debug_filepath and line > 0:
+            editor = self.editor_tabs.get_editor_for_file(self._debug_filepath)
+            if editor:
+                editor.set_debug_line(line)
+            self.debug_panel.set_status(f"Line {line}", "#4CAF50")
+    
+    def _on_debug_variable_updated(self, name: str, value: str):
+        """Handle variable value update"""
+        self.debug_panel.update_variable(name, value)
+    
+    def _on_debug_output(self, text: str):
+        """Handle program output during debug"""
+        self.debug_panel.append_output(text)
+    
+    def _on_debug_error(self, message: str):
+        """Handle debug error"""
+        self.debug_panel.append_error(message)
+        self.statusbar.showMessage(f"Debug error: {message}", 5000)
+    
+    def _on_debug_ready(self):
+        """Handle debug session ready for next step"""
+        self.debug_panel.set_step_enabled(True)

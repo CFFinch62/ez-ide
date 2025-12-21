@@ -1,0 +1,13 @@
+import @std
+using std
+
+// Display the program header
+do main() {
+    println("╔══════════════════════════════════════════╗")
+    println("║       PRICE METRICS CALCULATOR           ║")
+    println("╠══════════════════════════════════════════╣")
+    println("║  Calculate Price, Margin, Profit,        ║")
+    println("║  Markup, and Cost from any two values    ║")
+    println("╚══════════════════════════════════════════╝")
+    println("")
+}

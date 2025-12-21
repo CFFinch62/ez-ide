@@ -12,10 +12,11 @@ A comprehensive guide to using EZ IDE for developing EZ language applications.
 4. [Code Editor](#code-editor)
 5. [Integrated Terminal](#integrated-terminal)
 6. [Running EZ Programs](#running-ez-programs)
-7. [Theming](#theming)
-8. [Keyboard Shortcuts](#keyboard-shortcuts)
-9. [Configuration](#configuration)
-10. [Troubleshooting](#troubleshooting)
+7. [Step Debugging](#step-debugging)
+8. [Theming](#theming)
+9. [Keyboard Shortcuts](#keyboard-shortcuts)
+10. [Configuration](#configuration)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -82,6 +83,7 @@ EZ IDE features a modern, three-panel layout:
 - **Edit**: Undo, Redo, Cut, Copy, Paste, Find, Go to Line
 - **View**: Toggle File Browser, Toggle Terminal, Terminal Position, Themes, Word Wrap
 - **Run**: Run File, Select EZ Interpreter
+- **Debug**: Start Debugging, Step Over, Stop Debugging, Toggle Debug Panel
 - **Settings**: Open Settings dialog
 - **Help**: Documentation, About
 
@@ -91,6 +93,7 @@ Quick access buttons for:
 - Toggle File Browser visibility
 - Toggle Terminal visibility
 - Run current file
+- Start debugging (🐛)
 
 ### Status Bar
 
@@ -252,6 +255,51 @@ If the EZ binary is not in your system PATH, or you want to use a different vers
 
 ---
 
+## Step Debugging
+
+EZ IDE includes a REPL-based step debugger for stepping through your code and inspecting variables.
+
+### Starting a Debug Session
+
+1. Open an `.ez` file in the editor
+2. Press `F5` or click **🐛 Debug** in the toolbar, or use **Debug → Start Debugging**
+3. The Debug Panel opens on the right side of the IDE
+
+### Debug Panel
+
+The debug panel shows:
+
+- **Variables**: Displays all variables and their current values
+- **Output**: Shows program output during debugging
+- **Toolbar**: Start, Step, and Stop buttons
+
+### Stepping Through Code
+
+| Action | Shortcut | Description |
+|--------|----------|-------------|
+| **Start Debugging** | `F5` | Begin debugging the current file |
+| **Step Over** | `F10` | Execute the next statement |
+| **Stop Debugging** | `Shift+F5` | End the debug session |
+| **Toggle Debug Panel** | `Ctrl+Shift+D` | Show/hide the debug panel |
+
+### How It Works
+
+The debugger sends your code line-by-line to the EZ REPL. After each statement that creates or modifies a variable, it automatically inspects the variable values and displays them in the Variables panel.
+
+### Debug Highlighting
+
+During debugging, the current line is highlighted with a yellow background in the editor. The editor automatically scrolls to keep the current line visible.
+
+### Limitations
+
+> **Note**: This is a basic step debugger with some limitations:
+
+- **Block execution**: `if`, `while`, `for`, and function definitions execute as a single step
+- **No breakpoints**: Debugging always starts from the first line
+- **Requires @std**: Your file should have `import @std` for variable inspection to work
+
+---
+
 ## Theming
 
 EZ IDE supports extensive theming with 12 built-in themes.
@@ -390,7 +438,16 @@ Themes are automatically loaded on IDE startup.
 
 | Shortcut | Action |
 |----------|--------|
-| `F5` | Run Current File |
+| `F5` | Run Current File / Start Debugging |
+
+### Debugging
+
+| Shortcut | Action |
+|----------|--------|
+| `F5` | Start Debugging |
+| `F10` | Step Over |
+| `Shift+F5` | Stop Debugging |
+| `Ctrl+Shift+D` | Toggle Debug Panel |
 
 ### Settings
 

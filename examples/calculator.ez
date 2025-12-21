@@ -7,43 +7,6 @@
 import @std
 using std
 
-do main() {
-    println("=== Simple Calculator ===")
-    println("")
-
-    // Demo calculations
-    temp a float = 10.0
-    temp b float = 3.0
-
-    println("a = ${a}")
-    println("b = ${b}")
-    println("")
-
-    // Basic operations
-    println("-- Basic Operations --")
-    println("add(${a}, ${b}) = ${add(a, b)}")
-    println("subtract(${a}, ${b}) = ${subtract(a, b)}")
-    println("multiply(${a}, ${b}) = ${multiply(a, b)}")
-    println("divide(${a}, ${b}) = ${divide(a, b)}")
-
-    // More operations
-    println("")
-    println("-- More Operations --")
-    println("power(2, 8) = ${power(2, 8)}")
-    println("absolute(-42) = ${absolute(-42)}")
-    println("max(15, 23) = ${maximum(15, 23)}")
-    println("min(15, 23) = ${minimum(15, 23)}")
-
-    // Chained calculations
-    println("")
-    println("-- Chained Calculations --")
-    temp result float = add(multiply(2.0, 3.0), 4.0)
-    println("(2 * 3) + 4 = ${result}")
-
-    result = divide(subtract(20.0, 8.0), 3.0)
-    println("(20 - 8) / 3 = ${result}")
-}
-
 // Basic arithmetic functions
 do add(x float, y float) -> float {
     return x + y
@@ -99,4 +62,41 @@ do minimum(a int, b int) -> int {
         return a
     }
     return b
+}
+
+do main() {
+    println("=== Simple Calculator ===")
+    println("")
+
+    // Demo calculations
+    temp a float = 10.0
+    temp b float = 3.0
+
+    println("a = ${a}")
+    println("b = ${b}")
+    println("")
+
+    // Basic operations
+    println("-- Basic Operations --")
+    println("add(${a}, ${b}) = ${add(a, b)}")
+    println("subtract(${a}, ${b}) = ${subtract(a, b)}")
+    println("multiply(${a}, ${b}) = ${multiply(a, b)}")
+    println("divide(${a}, ${b}) = ${divide(a, b)}")
+
+    // More operations
+    println("")
+    println("-- More Operations --")
+    println("power(2, 8) = ${power(2, 8)}")
+    println("absolute(-42) = ${absolute(-42)}")
+    println("max(15, 23) = ${maximum(15, 23)}")
+    println("min(15, 23) = ${minimum(15, 23)}")
+
+    // Chained calculations
+    println("")
+    println("-- Chained Calculations --")
+    temp result float = add(multiply(2.0, 3.0), 4.0)
+    println("(2 * 3) + 4 = ${result}")
+
+    result = divide(subtract(20.0, 8.0), 3.0)
+    println("(20 - 8) / 3 = ${result}")
 }

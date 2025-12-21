@@ -6,7 +6,7 @@
 
 module display
 
-import @std, @os
+import @std, @os, @math
 using std
 
 // Display the program header
@@ -20,17 +20,22 @@ do show_header() {
     println("")
 }
 
+// Helper to round to 2 decimal places
+do format_decimal(val float) -> float {
+    return math.round(val * 100.0) / 100.0
+}
+
 // Display all calculated results
 do show_results(price, margin, profit, markup, cost float) {
     println("")
     println("┌──────────────────────────────────────────┐")
     println("│            CALCULATED RESULTS            │")
     println("├──────────────────────────────────────────┤")
-    println("│  Price:   $${price}")
-    println("│  Margin:   ${margin}%")
-    println("│  Profit:  $${profit}")
-    println("│  Markup:   ${markup}%")
-    println("│  Cost:    $${cost}")
+    println("│  Price:   $${format_decimal(price)}      │")
+    println("│  Margin:   ${format_decimal(margin)}%    │")
+    println("│  Profit:  $${format_decimal(profit)}     │")
+    println("│  Markup:   ${format_decimal(markup)}%    │")
+    println("│  Cost:    $${format_decimal(cost)}       │")
     println("└──────────────────────────────────────────┘")
     println("")
 }

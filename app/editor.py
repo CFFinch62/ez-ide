@@ -51,6 +51,7 @@ class CodeEditor(QPlainTextEdit):
         self.settings_manager = settings
         self.file_path: Optional[str] = None
         self._highlighter: Optional[EZHighlighter] = None
+        self._debug_line: int = -1  # Current debug line (-1 = not debugging)
         
         self._setup_editor()
         self._setup_line_numbers()
@@ -228,23 +229,35 @@ class CodeEditor(QPlainTextEdit):
             block_number += 1
     
     def highlight_current_line(self):
-        """Highlight the current line"""
+        """Highlight the current line and debug line"""
         extra_selections = []
         
-        if not self.settings_manager.settings.editor.highlight_current_line:
-            # Clear any existing selections when disabled
-            self.setExtraSelections([])
-            return
+        # Debug line highlight (takes precedence)
+        if self._debug_line > 0:
+            block = self.document().findBlockByLineNumber(self._debug_line - 1)
+            if block.isValid():
+                selection = QTextEdit.ExtraSelection()
+                # Use a distinctive yellow/orange color for debug line
+                debug_color = QColor("#3d3d00")  # Dark yellow background
+                selection.format.setBackground(debug_color)
+                selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                cursor = QTextCursor(block)
+                cursor.clearSelection()
+                selection.cursor = cursor
+                extra_selections.append(selection)
         
-        if not self.isReadOnly():
-            selection = QTextEdit.ExtraSelection()
-            line_color = QColor(self.theme.editor_line_highlight)
-            
-            selection.format.setBackground(line_color)
-            selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
-            selection.cursor = self.textCursor()
-            selection.cursor.clearSelection()
-            extra_selections.append(selection)
+        # Current cursor line highlight (if not on debug line)
+        if (self.settings_manager.settings.editor.highlight_current_line and 
+            not self.isReadOnly()):
+            current_block = self.textCursor().blockNumber()
+            if self._debug_line <= 0 or current_block != self._debug_line - 1:
+                selection = QTextEdit.ExtraSelection()
+                line_color = QColor(self.theme.editor_line_highlight)
+                selection.format.setBackground(line_color)
+                selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                selection.cursor = self.textCursor()
+                selection.cursor.clearSelection()
+                extra_selections.append(selection)
         
         self.setExtraSelections(extra_selections)
     
@@ -254,6 +267,29 @@ class CodeEditor(QPlainTextEdit):
         line = cursor.blockNumber() + 1
         column = cursor.columnNumber() + 1
         self.cursor_position_changed.emit(line, column)
+    
+    def set_debug_line(self, line: int):
+        """
+        Set the current debug line (1-indexed)
+        
+        Args:
+            line: Line number to highlight, or -1 to clear
+        """
+        self._debug_line = line
+        self.highlight_current_line()
+        
+        # Scroll to the debug line if valid
+        if line > 0:
+            block = self.document().findBlockByLineNumber(line - 1)
+            if block.isValid():
+                cursor = QTextCursor(block)
+                self.setTextCursor(cursor)
+                self.centerCursor()
+    
+    def clear_debug_line(self):
+        """Clear the debug line highlight"""
+        self._debug_line = -1
+        self.highlight_current_line()
     
     def set_file(self, filepath: str):
         """Load a file into the editor"""
@@ -702,6 +738,11 @@ class EditorTabs(QTabWidget):
             if ed == editor:
                 return filepath if not filepath.startswith("__untitled_") else None
         return None
+    
+    def get_editor_for_file(self, filepath: str) -> Optional[CodeEditor]:
+        """Get the editor for a specific filepath"""
+        filepath = os.path.abspath(filepath)
+        return self.editors.get(filepath)
     
     def set_theme(self, theme: Theme):
         """Update theme for all editors"""

@@ -52,6 +52,12 @@ EZ IDE is a full-featured integrated development environment built with Python a
 - **Custom Themes**: Create your own themes via JSON files
 - **Persistent Settings**: All preferences saved to local JSON configuration
 
+### 🐛 Step Debugging
+- **REPL-based debugger**: Step through code using the actual EZ interpreter
+- **Variable inspection**: Watch variables update as you step
+- **Debug highlighting**: Current line highlighted in the editor
+- **Simple controls**: F5 to start, F10 to step, Shift+F5 to stop
+
 ## Installation
 
 ### Prerequisites
@@ -122,6 +128,14 @@ Go to **Run → Select EZ Interpreter** to specify a custom path to your EZ bina
 | `Ctrl+-` | Zoom Out |
 | `Ctrl+0` | Reset Zoom |
 
+### Debugging
+| Shortcut | Action |
+|----------|--------|
+| `F5` | Start Debugging |
+| `F10` | Step Over |
+| `Shift+F5` | Stop Debugging |
+| `Ctrl+Shift+D` | Toggle Debug Panel |
+
 ## Configuration
 
 ### Settings Location
@@ -186,7 +200,9 @@ ez_ide/
     ├── syntax.py        # EZ syntax highlighter
     ├── editor.py        # Code editor widgets
     ├── file_browser.py  # File browser widget
-    └── terminal.py      # Terminal widget
+    ├── terminal.py      # Terminal widget
+    ├── debug_session.py # Step debugger REPL manager
+    └── debug_panel.py   # Debug UI panel
 ```
 
 ## License

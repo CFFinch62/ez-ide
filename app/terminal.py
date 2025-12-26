@@ -58,6 +58,17 @@ class TerminalOutput(QPlainTextEdit):
         self.setMaximumBlockCount(10000)  # Limit scrollback
         self._default_format = QTextCharFormat()
         self._current_format = QTextCharFormat()
+        
+        # Disable word wrap to preserve preformatted text alignment
+        self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+    
+    def set_terminal_font(self, font_family: str, font_size: int):
+        """Set the terminal font with proper monospace/fixed-pitch settings"""
+        font = QFont(font_family, font_size)
+        font.setFixedPitch(True)
+        font.setStyleHint(QFont.StyleHint.Monospace)
+        self.setFont(font)
+        self.document().setDefaultFont(font)
     
     def append_output(self, text: str, color: QColor = None):
         """Append text to the terminal output, parsing ANSI codes"""
@@ -133,7 +144,8 @@ class TerminalInput(QLineEdit):
     
     def keyPressEvent(self, event: QKeyEvent):
         """Handle special keys"""
-        if event.key() == Qt.Key.Key_Return:
+        # Handle both main Enter (Key_Return) and numpad Enter (Key_Enter)
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             command = self.text()
             self.clear()
             self.command_entered.emit(command)
@@ -163,6 +175,9 @@ class TerminalWidget(QWidget):
         self.current_dir = str(Path.home())
         self.command_history: list = []
         self.history_index = -1
+        
+        # Track the currently running command process for interactive input
+        self.running_process: Optional[QProcess] = None
         
         self._setup_ui()
         self._setup_connections()
@@ -271,10 +286,14 @@ class TerminalWidget(QWidget):
                 background-color: {self.theme.terminal_background};
                 color: {self.theme.terminal_foreground};
                 border: none;
-                font-family: "{self.settings_manager.settings.terminal.font_family}";
-                font-size: {self.settings_manager.settings.terminal.font_size}pt;
             }}
         """)
+        
+        # Set font programmatically for proper monospace rendering of Unicode
+        self.output.set_terminal_font(
+            self.settings_manager.settings.terminal.font_family,
+            self.settings_manager.settings.terminal.font_size
+        )
         
         self.output.set_default_color(QColor(self.theme.terminal_foreground))
         
@@ -314,8 +333,13 @@ class TerminalWidget(QWidget):
                                    QColor(self.theme.info))
     
     def _execute_command(self, command: str):
-        """Execute a command"""
-        if not command.strip():
+        """Execute a command or send input to running process"""
+        if not command.strip() and not self.running_process:
+            return
+        
+        # If there's a running process, send input to it instead
+        if self.running_process and self.running_process.state() == QProcess.ProcessState.Running:
+            self._send_input_to_process(command)
             return
         
         # Add to history
@@ -342,6 +366,15 @@ class TerminalWidget(QWidget):
         # Run external command
         self._run_command(command)
     
+    def _send_input_to_process(self, text: str):
+        """Send input to the currently running process"""
+        if self.running_process and self.running_process.state() == QProcess.ProcessState.Running:
+            # Echo the input in the terminal
+            self.output.append_output(f"{text}\n", QColor(self.theme.terminal_foreground))
+            # Send the input with newline to the process stdin
+            input_bytes = (text + "\n").encode('utf-8')
+            self.running_process.write(input_bytes)
+    
     def _handle_cd(self, path: str):
         """Handle cd command"""
         # Handle ~ for home directory
@@ -366,7 +399,7 @@ class TerminalWidget(QWidget):
                                        QColor(self.theme.error))
     
     def _run_command(self, command: str):
-        """Run an external command"""
+        """Run an external command asynchronously with interactive support"""
         shell = self.shell_combo.currentText()
         
         if sys.platform == 'win32':
@@ -383,26 +416,32 @@ class TerminalWidget(QWidget):
             args = ['-c', command]
             program = shell if shell else '/bin/sh'
         
+        # Clean up any previous running process
+        if self.running_process:
+            self.running_process.deleteLater()
+        
         process = QProcess(self)
         process.setWorkingDirectory(self.current_dir)
         process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         
-        # Capture output
+        # Store as the running process for interactive input
+        self.running_process = process
+        
+        # Update prompt to indicate we're in a running program
+        self.prompt_label.setText(">")
+        self.input.setPlaceholderText("Enter input for program (or Ctrl+C to stop)...")
+        
+        # Capture output asynchronously
         process.readyReadStandardOutput.connect(
             lambda: self._on_command_output(process)
         )
         process.finished.connect(
-            lambda code, status: self._on_command_finished(code, status)
+            lambda code, status: self._on_command_finished(code, status, process)
         )
         
         process.start(program, args)
         
-        # Wait with timeout
-        if not process.waitForFinished(30000):  # 30 second timeout
-            process.kill()
-            self.output.append_output("\nCommand timed out.\n", 
-                                       QColor(self.theme.warning))
-        
+        # Don't wait - let it run asynchronously
         self.command_executed.emit(command)
     
     def _on_command_output(self, process: QProcess):
@@ -411,11 +450,25 @@ class TerminalWidget(QWidget):
         text = bytes(data).decode('utf-8', errors='replace')
         self.output.append_output(text)
     
-    def _on_command_finished(self, exit_code: int, exit_status):
+    def _on_command_finished(self, exit_code: int, exit_status, process: QProcess = None):
         """Handle command completion"""
+        # Clear the running process if this was it
+        if process and process == self.running_process:
+            self.running_process = None
+            # Reset prompt back to normal (with safety check for widget deletion)
+            try:
+                self.prompt_label.setText("$")
+                self.input.setPlaceholderText("Enter command...")
+            except RuntimeError:
+                # Widget was deleted, ignore
+                pass
+        
         if exit_code != 0:
-            self.output.append_output(f"\nProcess exited with code {exit_code}\n",
-                                       QColor(self.theme.warning))
+            try:
+                self.output.append_output(f"\nProcess exited with code {exit_code}\n",
+                                           QColor(self.theme.warning))
+            except RuntimeError:
+                pass
     
     def _on_output_ready(self):
         """Handle output from shell process"""
@@ -483,14 +536,32 @@ class TerminalWidget(QWidget):
     
     def clear_output(self):
         """Clear the terminal output"""
+        # Kill any running process and reset prompt
+        self._stop_running_process()
         self.output.clear()
         self.output.append_output(f"Terminal ready. Working directory: {self.current_dir}\n",
                                    QColor(self.theme.info))
     
     def restart_shell(self):
         """Restart the shell"""
+        # Kill any running process and reset prompt
+        self._stop_running_process()
         self.clear_output()
         self._start_shell()
+    
+    def _stop_running_process(self):
+        """Stop any running process and reset the prompt"""
+        if self.running_process and self.running_process.state() == QProcess.ProcessState.Running:
+            self.running_process.kill()
+            self.running_process.waitForFinished(1000)
+        self.running_process = None
+        # Reset prompt back to normal
+        try:
+            self.prompt_label.setText("$")
+            self.input.setPlaceholderText("Enter command...")
+        except RuntimeError:
+            # Widget was deleted, ignore
+            pass
     
     def set_working_directory(self, path: str):
         """Set the working directory"""

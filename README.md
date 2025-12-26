@@ -41,10 +41,13 @@ EZ IDE is a full-featured integrated development environment built with Python a
 
 ### 💻 Integrated Terminal
 - Execute shell commands directly within the IDE
+- **Interactive input support**: Send input to running programs (prompt changes from `$` to `>`)
 - Command history navigation (up/down arrows)
 - Quick EZ file execution with `F5`
 - Flexible positioning: below or to the right of the editor
 - Toggle visibility with `` Ctrl+` `` or via toolbar
+
+> **Note**: Programs using UTF-8 box drawing characters (╔═║╚ etc.) may not display with correct alignment in the integrated terminal due to Qt font rendering limitations. For testing programs that rely on these characters for visual formatting, use **Run → Open External Terminal** for accurate display.
 
 ### 🎨 Theming System
 - **12 Built-in Themes**: Including Dark, Light, Monokai, Nord, Dracula, One Dark, Gruvbox Dark, Tokyo Night, Solarized Light, GitHub Light, Gruvbox Light, and One Light

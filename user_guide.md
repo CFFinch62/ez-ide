@@ -257,46 +257,246 @@ If the EZ binary is not in your system PATH, or you want to use a different vers
 
 ## Step Debugging
 
-EZ IDE includes a REPL-based step debugger for stepping through your code and inspecting variables.
+EZ IDE includes powerful debugging capabilities with automatic detection of the best available debugger.
+
+### Debugger Types
+
+The IDE automatically detects and uses the best available debugger:
+
+| Type | Icon | Features | Performance |
+|------|------|----------|-------------|
+| **Native Debugger** | 🟢 | Full features: Step Into/Over/Out, Breakpoints, Call Stack, Variables | Fast |
+| **REPL Debugger** | 🟡 | Limited features: Step, Variables | Slower |
+
+The debugger type is shown in the debug panel header.
 
 ### Starting a Debug Session
 
-1. Open an `.ez` file in the editor
-2. Press `F5` or click **🐛 Debug** in the toolbar, or use **Debug → Start Debugging**
-3. The Debug Panel opens on the right side of the IDE
+1. **Open an EZ file** in the editor
+2. **Start debugging** using any of these methods:
+   - Press `F5`
+   - Click **🐛 Debug** in the toolbar
+   - Use **Debug → Start Debugging** from the menu
+3. **The Debug Panel** opens on the right side
 
 ### Debug Panel
 
-The debug panel shows:
+The debug panel contains three main sections:
 
-- **Variables**: Displays all variables and their current values
-- **Output**: Shows program output during debugging
-- **Toolbar**: Start, Step, and Stop buttons
+#### Toolbar
+- **Debugger Type Indicator**: Shows which debugger is active (🟢 Native or 🟡 REPL)
+- **▶ Start/Resume**: Begin or continue debugging
+- **→ Step**: Execute next statement
+- **■ Stop**: End the debug session
+- **Clear**: Clear variables and output
+- **Status**: Shows current line or state
 
-### Stepping Through Code
+#### Variables Panel
+- Displays all variables in the current scope
+- Shows variable name, value, and type
+- Updates automatically as you step through code
+- Highlights recently changed variables
+
+#### Output Panel
+- Shows program output during debugging
+- Displays error messages in red
+- Supports ANSI color codes
+- Auto-scrolls to latest output
+
+### Debugging Controls
 
 | Action | Shortcut | Description |
 |--------|----------|-------------|
 | **Start Debugging** | `F5` | Begin debugging the current file |
-| **Step Over** | `F10` | Execute the next statement |
+| **Step Into** | `F10` | Execute next statement, entering function calls |
+| **Step Over** | `F10` | Execute next statement, skipping over function calls |
+| **Step Out** | `Shift+F11` | Run until return from current function |
+| **Continue** | `F5` (while debugging) | Run until next breakpoint |
 | **Stop Debugging** | `Shift+F5` | End the debug session |
 | **Toggle Debug Panel** | `Ctrl+Shift+D` | Show/hide the debug panel |
 
-### How It Works
-
-The debugger sends your code line-by-line to the EZ REPL. After each statement that creates or modifies a variable, it automatically inspects the variable values and displays them in the Variables panel.
+> **Note**: Step Into/Over/Out are only available with the Native Debugger (🟢). The REPL Debugger (🟡) only supports basic stepping.
 
 ### Debug Highlighting
 
-During debugging, the current line is highlighted with a yellow background in the editor. The editor automatically scrolls to keep the current line visible.
+During debugging:
+- **Current line** is highlighted with a yellow background
+- **Editor automatically scrolls** to keep the current line visible
+- **Line numbers** show the execution position
 
-### Limitations
+### Using the Native Debugger (🟢)
 
-> **Note**: This is a basic step debugger with some limitations:
+The native debugger provides full debugging features:
 
-- **Block execution**: `if`, `while`, `for`, and function definitions execute as a single step
-- **No breakpoints**: Debugging always starts from the first line
-- **Requires @std**: Your file should have `import @std` for variable inspection to work
+#### Setting Breakpoints
+1. Click in the left margin next to a line number
+2. A red dot appears indicating a breakpoint
+3. Program execution will pause when reaching this line
+
+#### Stepping Through Code
+- **Step Into** (`F10`): Steps into function calls to debug them
+- **Step Over** (`F10`): Executes function calls without stepping into them
+- **Step Out** (`Shift+F11`): Runs until the current function returns
+
+#### Viewing the Call Stack
+The call stack panel shows:
+- Current function and line
+- All calling functions
+- Click any frame to view its variables
+
+#### Variable Inspection
+- All variables in the current scope are shown
+- Expand complex types (arrays, maps, structs) to see contents
+- Hover over variables in the editor to see their values
+
+### Using the REPL Debugger (🟡)
+
+The REPL debugger is a fallback with limited features:
+
+#### How It Works
+- Parses your code into individual statements
+- Sends each statement to the EZ REPL
+- Automatically inspects variables after each step
+- Shows variable values in the Variables panel
+
+#### Stepping Through Code
+- Click **→ Step** or press `F10` to execute the next statement
+- Variables update automatically
+- Output appears in the Output panel
+
+#### Limitations
+- **No breakpoints**: Must step through from the beginning
+- **No Step Into/Over/Out**: Only basic stepping
+- **No call stack**: Limited function call information
+- **Slower**: Parses and sends statements individually
+- **Relative imports**: May not work with relative imports
+
+### Debug Workflow Example
+
+1. **Open your EZ file**:
+   ```ez
+   import @std
+   using std
+   
+   do main() {
+       temp x int = 10
+       temp y int = 20
+       temp sum int = x + y
+       println("Sum: ${sum}")
+   }
+   ```
+
+2. **Start debugging** (F5)
+   - Debug panel opens
+   - Debugger type is shown (🟢 or 🟡)
+   - Execution pauses at first statement
+
+3. **Step through code** (F10)
+   - Line `temp x int = 10` executes
+   - Variable `x` appears in Variables panel with value `10`
+   
+4. **Continue stepping**
+   - Line `temp y int = 20` executes
+   - Variable `y` appears with value `20`
+   - Line `temp sum int = x + y` executes
+   - Variable `sum` appears with value `30`
+
+5. **View output**
+   - Line `println("Sum: ${sum}")` executes
+   - Output "Sum: 30" appears in Output panel
+
+6. **Stop debugging** (Shift+F5)
+   - Debug session ends
+   - Highlighting is cleared
+   - Variables remain visible for review
+
+### Debugging Tips
+
+#### For Best Results
+- **Use the Native Debugger** when available (🟢)
+- **Save your file** before debugging
+- **Check the debugger type** in the debug panel header
+- **Use breakpoints** to skip to specific locations (Native only)
+
+#### Common Issues
+
+**Debugger not starting:**
+- Ensure EZ interpreter is installed and in PATH
+- Check **Run → Select EZ Interpreter** if needed
+- Verify the file has no syntax errors
+
+**Variables not showing:**
+- Ensure you're using `temp` or `const` to declare variables
+- Check that the statement has executed (step past it)
+- For REPL debugger, ensure `import @std` is present
+
+**Slow debugging:**
+- REPL debugger (🟡) is slower than Native (🟢)
+- Consider using the Native debugger if available
+- For large programs, use breakpoints to skip sections
+
+**Relative imports failing:**
+- REPL debugger doesn't support relative imports
+- Use absolute imports or the Native debugger
+
+### Advanced Features (Native Debugger Only)
+
+#### Conditional Breakpoints
+Set breakpoints that only trigger when a condition is true:
+1. Right-click on a breakpoint
+2. Select "Edit Breakpoint"
+3. Enter a condition (e.g., `x > 10`)
+
+> **Note**: This feature may not be available in all versions.
+
+#### Watch Expressions
+Monitor specific expressions as you debug:
+1. Open the Watch panel
+2. Add an expression (e.g., `x + y`)
+3. Value updates as you step through code
+
+> **Note**: This feature may not be available in all versions.
+
+### Selecting the Debugger
+
+The IDE automatically selects the best debugger, but you can influence this:
+
+1. **Install EZ with debugger support**:
+   - Use the latest EZ version with `ez debugserver` command
+   - The IDE will automatically detect and use the Native debugger
+
+2. **Check debugger type**:
+   - Look at the debug panel header
+   - 🟢 = Native (full features)
+   - 🟡 = REPL (limited features)
+
+3. **Configure EZ interpreter**:
+   - Go to **Run → Select EZ Interpreter**
+   - Choose the EZ binary with debugger support
+   - Restart the IDE to re-detect capabilities
+
+### Troubleshooting Debugging
+
+**Debug panel not showing:**
+- Press `Ctrl+Shift+D` to toggle visibility
+- Or use **Debug → Toggle Debug Panel**
+
+**Debugger hangs:**
+- Click **■ Stop** to end the session
+- If unresponsive, restart the IDE
+- Check for infinite loops in your code
+
+**Variables not updating:**
+- Ensure you've stepped past the variable declaration
+- For REPL debugger, check that `import @std` is present
+- Try restarting the debug session
+
+**Breakpoints not working:**
+- Breakpoints only work with Native debugger (🟢)
+- Ensure the line has executable code
+- Check that the file path is correct
+
+For more debugging information, see the [Debugger Integration Guide](docs/DEBUGGER_INTEGRATION.md).
 
 ---
 

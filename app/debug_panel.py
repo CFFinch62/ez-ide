@@ -21,6 +21,7 @@ class DebugToolbar(QFrame):
     start_clicked = pyqtSignal()
     step_clicked = pyqtSignal()
     stop_clicked = pyqtSignal()
+    clear_clicked = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,6 +38,12 @@ class DebugToolbar(QFrame):
         title = QLabel("Debug")
         title.setStyleSheet("font-weight: bold; font-size: 11px;")
         layout.addWidget(title)
+        
+        # Debugger type indicator
+        self.debugger_type_label = QLabel("")
+        self.debugger_type_label.setStyleSheet("font-size: 9px; color: gray; font-style: italic;")
+        self.debugger_type_label.setToolTip("Debugger type")
+        layout.addWidget(self.debugger_type_label)
         
         layout.addSpacing(12)
         
@@ -60,6 +67,12 @@ class DebugToolbar(QFrame):
         self.stop_btn.setToolTip("Stop debugging (Shift+F5)")
         self.stop_btn.clicked.connect(self.stop_clicked.emit)
         layout.addWidget(self.stop_btn)
+
+        self.clear_btn = QToolButton()
+        self.clear_btn.setText("Clear")
+        self.clear_btn.setToolTip("Clear variables and output")
+        self.clear_btn.clicked.connect(self.clear_clicked.emit)
+        layout.addWidget(self.clear_btn)
         
         layout.addStretch()
         
@@ -73,6 +86,7 @@ class DebugToolbar(QFrame):
         self.start_btn.setEnabled(not debugging)
         self.step_btn.setEnabled(debugging)
         self.stop_btn.setEnabled(debugging)
+        self.clear_btn.setEnabled(not debugging)
     
     def set_debugging(self, active: bool):
         """Set debugging state"""
@@ -94,6 +108,11 @@ class DebugToolbar(QFrame):
     def set_step_enabled(self, enabled: bool):
         """Enable or disable the step button"""
         self.step_btn.setEnabled(enabled)
+    
+    def set_debugger_type(self, icon: str, name: str):
+        """Set the debugger type indicator"""
+        self.debugger_type_label.setText(f"{icon} {name}")
+        self.debugger_type_label.setToolTip(f"Using {name}")
 
 
 class VariableTree(QTreeWidget):
@@ -331,6 +350,7 @@ class DebugPanel(QWidget):
         self.toolbar.start_clicked.connect(self.start_requested.emit)
         self.toolbar.step_clicked.connect(self.step_requested.emit)
         self.toolbar.stop_clicked.connect(self.stop_requested.emit)
+        self.toolbar.clear_clicked.connect(self.clear_output_and_variables)
     
     def set_theme(self, theme: Theme):
         """Apply theme to all components"""
@@ -363,6 +383,10 @@ class DebugPanel(QWidget):
         """Enable/disable step button"""
         self.toolbar.set_step_enabled(enabled)
     
+    def set_debugger_type(self, icon: str, name: str):
+        """Set the debugger type indicator"""
+        self.toolbar.set_debugger_type(icon, name)
+    
     def update_variable(self, name: str, value: str):
         """Update a variable's value"""
         self.variable_tree.update_variable(name, value)
@@ -374,6 +398,10 @@ class DebugPanel(QWidget):
     def append_error(self, text: str):
         """Append error message"""
         self.output.append_error(text)
+
+    def clear_output_and_variables(self):
+        self.variable_tree.clear_variables()
+        self.output.clear()
     
     def reset(self):
         """Reset the panel to initial state"""

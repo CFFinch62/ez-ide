@@ -29,7 +29,9 @@ from app.file_browser import FileBrowserWidget
 from app.editor import EditorTabs
 from app.terminal import TerminalWidget
 from app.debug_session import DebugSession
+from app.go_debug_session import GoDebugSession
 from app.debug_panel import DebugPanel
+from app.debugger_utils import detect_debugger_support, get_debugger_display_name, get_debugger_icon
 
 
 class SettingsDialog(QDialog):
@@ -1002,8 +1004,32 @@ class EZIDEMainWindow(QMainWindow):
     # Debug operations
     def _setup_debug(self):
         """Initialize the debug session and connect signals"""
-        self.debug_session = DebugSession(self.settings, self)
+        # Detect best available debugger
+        ez_path = self.settings.settings.ez.interpreter_path
+        if not ez_path or not os.path.isfile(ez_path):
+            ez_path = shutil.which('ez')
+        
+        self.debugger_capabilities = detect_debugger_support(ez_path or '')
+        
+        # Create appropriate debug session based on capabilities
+        if self.debugger_capabilities.type == 'native':
+            self.debug_session = GoDebugSession(self.settings, self)
+            self.statusbar.showMessage(
+                f"{get_debugger_icon('native')} Using Native Debugger", 3000
+            )
+        else:
+            self.debug_session = DebugSession(self.settings, self)
+            if self.debugger_capabilities.type == 'repl':
+                self.statusbar.showMessage(
+                    f"{get_debugger_icon('repl')} Using REPL Debugger (Limited Features)", 3000
+                )
+            else:
+                self.statusbar.showMessage(
+                    f"{get_debugger_icon('none')} Debugger not available", 3000
+                )
+        
         self._debug_filepath = None  # Track the file being debugged
+        self._debugger_type = self.debugger_capabilities.type
         
         # Connect debug session signals
         self.debug_session.session_started.connect(self._on_debug_started)
@@ -1018,6 +1044,11 @@ class EZIDEMainWindow(QMainWindow):
         self.debug_panel.start_requested.connect(self._debug_start)
         self.debug_panel.step_requested.connect(self._debug_step)
         self.debug_panel.stop_requested.connect(self._debug_stop)
+        
+        # Set debugger type indicator in panel
+        debugger_icon = get_debugger_icon(self._debugger_type)
+        debugger_name = get_debugger_display_name(self._debugger_type)
+        self.debug_panel.set_debugger_type(debugger_icon, debugger_name)
     
     def _toggle_debug_panel(self):
         """Toggle visibility of the debug panel"""
@@ -1045,7 +1076,18 @@ class EZIDEMainWindow(QMainWindow):
         
         # Start the debug session
         self._debug_filepath = filepath
-        if self.debug_session.start(filepath):
+        working_dir = os.path.dirname(filepath)
+        root = getattr(self.file_browser, 'current_root', None)
+        if root and os.path.isdir(root):
+            try:
+                root_abs = os.path.abspath(root)
+                file_abs = os.path.abspath(filepath)
+                if os.path.commonpath([root_abs, file_abs]) == root_abs:
+                    working_dir = root_abs
+            except ValueError:
+                pass
+
+        if self.debug_session.start(filepath, working_dir=working_dir):
             self.statusbar.showMessage(f"Debugging: {os.path.basename(filepath)}", 0)
     
     def _debug_step(self):
@@ -1077,7 +1119,16 @@ class EZIDEMainWindow(QMainWindow):
         self.debug_panel.set_debugging(True)
         # Don't reset here - we want to keep accumulating output
         self.debug_start_action.setEnabled(False)
-        self.debug_step_action.setEnabled(True)
+        supports_step = True
+        try:
+            supports_step = self.debug_session.supports_step()
+        except AttributeError:
+            supports_step = True
+
+        self.debug_step_action.setEnabled(supports_step)
+        self.debug_panel.set_step_enabled(supports_step)
+        if not supports_step:
+            self.debug_panel.set_status("Running (no stepping)", "gray")
         self.debug_stop_action.setEnabled(True)
     
     def _on_debug_ended(self):

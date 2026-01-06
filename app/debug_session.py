@@ -76,9 +76,13 @@ class DebugSession(QObject):
         self.working_dir = ""
         self._pending_output = ""
         self._waiting_for_response = False
+        self._supports_step = True
         self._step_timer = QTimer(self)
         self._step_timer.setSingleShot(True)
         self._step_timer.timeout.connect(self._check_ready)
+
+    def supports_step(self) -> bool:
+        return self._supports_step
     
     def _get_ez_interpreter(self) -> Optional[str]:
         """Get the EZ interpreter path"""
@@ -87,12 +91,13 @@ class DebugSession(QObject):
             return configured
         return shutil.which('ez')
     
-    def start(self, filepath: str) -> bool:
+    def start(self, filepath: str, working_dir: Optional[str] = None) -> bool:
         """
         Start a debug session for the given file
         
         Args:
             filepath: Path to the .ez file to debug
+            working_dir: Working directory to use for the REPL (optional)
             
         Returns:
             True if session started successfully
@@ -115,37 +120,69 @@ class DebugSession(QObject):
         except Exception as e:
             self.error_received.emit(f"Error reading file: {e}")
             return False
+
+        self._supports_step = not self._has_relative_imports(self.source_code)
         
-        self.working_dir = os.path.dirname(filepath)
+        if working_dir and os.path.isdir(working_dir):
+            self.working_dir = working_dir
+        else:
+            self.working_dir = os.path.dirname(filepath)
         
-        # Parse statements - separates setup code from steppable main body
-        self.setup_statements, self.statements = self._parse_statements(self.source_code)
-        if not self.statements:
-            self.error_received.emit("No statements found in main procedure")
-            return False
+        if self._supports_step:
+            # Parse statements - separates setup code from steppable main body
+            self.setup_statements, self.statements = self._parse_statements(self.source_code)
+            if not self.statements:
+                self.error_received.emit("No statements found in main procedure")
+                return False
+        else:
+            self.setup_statements = []
+            self.statements = []
         
-        # Start REPL process
+        # Start process
         self.process = QProcess(self)
         self.process.setWorkingDirectory(self.working_dir)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._on_output)
         self.process.finished.connect(self._on_finished)
         self.process.errorOccurred.connect(self._on_error)
-        
-        self.process.start(ez_cmd, ['repl'])
+
+        if self._supports_step:
+            self.process.start(ez_cmd, ['repl'])
+        else:
+            self.process.start(ez_cmd, [filepath])
         
         if not self.process.waitForStarted(5000):
-            self.error_received.emit("Failed to start EZ REPL")
+            if self._supports_step:
+                self.error_received.emit("Failed to start EZ REPL")
+            else:
+                self.error_received.emit("Failed to start EZ program")
             return False
         
         self.current_index = 0
         self.tracked_variables.clear()
         self._waiting_for_response = False
+
+        if not self._supports_step:
+            self.output_received.emit("[INFO] Relative module imports detected (import \"./...\"); stepping is disabled for this debug run.")
+            self.session_started.emit()
+            return True
         
         # Wait a moment for REPL to initialize
         QTimer.singleShot(200, self._repl_ready)
         
         return True
+
+    def _has_relative_imports(self, source: str) -> bool:
+        for line in source.split('\n'):
+            stripped = line.strip()
+            if not stripped or stripped.startswith('//'):
+                continue
+            if not self.IMPORT_PATTERN.match(stripped):
+                continue
+
+            if '"./' in stripped or '"../' in stripped:
+                return True
+        return False
     
     def _repl_ready(self):
         """Called when REPL is ready"""
@@ -184,6 +221,10 @@ class DebugSession(QObject):
         """
         if not self.process or self.process.state() != QProcess.ProcessState.Running:
             self.error_received.emit("Debug session not running")
+            return False
+
+        if not self._supports_step:
+            self.error_received.emit("Stepping is not available for this program (module imports are not supported in REPL debug mode)")
             return False
         
         if self.current_index >= len(self.statements):
@@ -251,9 +292,12 @@ class DebugSession(QObject):
     def stop(self):
         """Stop the debug session"""
         if self.process:
-            # Send exit command
-            self._send_to_repl("exit")
-            self.process.waitForFinished(1000)
+            if self._supports_step:
+                self._send_to_repl("exit")
+                self.process.waitForFinished(1000)
+            else:
+                self.process.terminate()
+                self.process.waitForFinished(1000)
             
             if self.process.state() == QProcess.ProcessState.Running:
                 self.process.kill()
@@ -279,6 +323,9 @@ class DebugSession(QObject):
         data = self.process.readAllStandardOutput()
         text = bytes(data).decode('utf-8', errors='replace')
         self._pending_output += text
+
+        if not self._supports_step:
+            self._process_pending_output()
     
     def _process_pending_output(self):
         """Process accumulated output"""

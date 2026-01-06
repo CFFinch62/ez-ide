@@ -8,6 +8,17 @@
 import @std
 using std
 
+// Recursive Fibonacci
+do fibonacci(n int) -> int {
+    if n <= 0 {
+        return 0
+    }
+    if n == 1 {
+        return 1
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
 do main() {
     println("=== Fibonacci Sequence ===")
     println("")
@@ -25,15 +36,4 @@ do main() {
         sum = sum + fibonacci(i)
     }
     println("Sum of first 10: ${sum}")
-}
-
-// Recursive Fibonacci
-do fibonacci(n int) -> int {
-    if n <= 0 {
-        return 0
-    }
-    if n == 1 {
-        return 1
-    }
-    return fibonacci(n - 1) + fibonacci(n - 2)
 }
